@@ -180,6 +180,9 @@ module Resque
     redis.sadd(:queues, queue.to_s)
   end
 
+  def flush_queue(queue)
+    amqp.purge(queue)
+  end
 
   #
   # job shortcuts
