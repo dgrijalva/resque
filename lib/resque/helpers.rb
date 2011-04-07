@@ -3,9 +3,9 @@ module Resque
   module Helpers
     class DecodeException < StandardError; end
 
-    # Direct access to the Redis instance.
-    def redis
-      Resque.redis
+    # Direct access to the AMQP instance.
+    def amqp
+      Resque.amqp
     end
 
     # Given a Ruby object, returns a string suitable for storage in a
