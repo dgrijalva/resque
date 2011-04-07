@@ -1,3 +1,6 @@
+require 'eventmachine'
+require 'amqp'
+
 require 'redis/namespace'
 
 begin
@@ -27,44 +30,26 @@ module Resque
   #   1. A 'hostname:port' string
   #   2. A 'hostname:port:db' string (to select the Redis db)
   #   3. A 'hostname:port/namespace' string (to set the Redis namespace)
-  #   4. A redis URL string 'redis://host:port'
   #   5. An instance of `Redis`, `Redis::Client`, `Redis::DistRedis`,
   #      or `Redis::Namespace`.
-  def redis=(server)
+  def amqp=(server)
+    if(!EM.reactor_running?)
+      Thread.new{EM.run}
+    end
+    
     if server.respond_to? :split
-      if server =~ /redis\:\/\//
-        redis = Redis.connect(:url => server, :thread_safe => true)
-      else
-        server, namespace = server.split('/', 2)
-        host, port, db = server.split(':')
-        redis = Redis.new(:host => host, :port => port,
-          :thread_safe => true, :db => db)
-      end
-      namespace ||= :resque
-
-      @redis = Redis::Namespace.new(namespace, :redis => redis)
-    elsif server.respond_to? :namespace=
-        @redis = server
+      server, namespace = server.split('/', 2)
+      host, port, db = server.split(':')
+      @amqp = AMQP.connect(:host => host, :user => 'guest', :pass => 'guest', :vhost => db || '/')
     else
-      @redis = Redis::Namespace.new(:resque, :redis => server)
+      @amqp = server
     end
   end
 
   # Returns the current Redis connection. If none has been created, will
   # create a new one.
-  def redis
-    return @redis if @redis
-    self.redis = Redis.respond_to?(:connect) ? Redis.connect : "localhost:6379"
-    self.redis
-  end
-
-  def redis_id
-    # support 1.x versions of redis-rb
-    if redis.respond_to?(:server)
-      redis.server
-    else
-      redis.client.id
-    end
+  def amqp
+    return @amqp if @amqp
   end
 
   # The `before_first_fork` hook will be run in the **parent** process
@@ -115,7 +100,7 @@ module Resque
   end
 
   def to_s
-    "Resque Client connected to #{redis_id}"
+    "Resque Client connected #{@amqp}"
   end
 
   # If 'inline' is true Resque will call #perform method inline
